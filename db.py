@@ -108,7 +108,7 @@ def init_db():
 
 def level_threshold(level: int) -> int:
     """إجمالي العملات المطلوبة عشان توصل للمستوى ده"""
-    return 100 * level * (level - 1)
+    return 1000 * level * (level - 1)
 
 
 def compute_level(coins: int) -> int:
@@ -122,7 +122,8 @@ def compute_level(coins: int) -> int:
 
 
 def coins_per_tap(level: int) -> int:
-    return level
+    return (level // 10) + 1
+
 
 
 def level_progress(coins: int, level: int):
