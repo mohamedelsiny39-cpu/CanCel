@@ -67,7 +67,6 @@ const els = {
   adBtn: document.getElementById("adBtn"),
   adOverlay: document.getElementById("adOverlay"),
   adProgressFill: document.getElementById("adProgressFill"),
-  adCountdown: document.getElementById("adCountdown"),
   tasksList: document.getElementById("tasksList"),
   boardList: document.getElementById("boardList"),
   myRank: document.getElementById("myRank"),
@@ -203,7 +202,6 @@ els.coinBtn.addEventListener("click", () => {
     setTimeout(() => (els.coinBtn.style.transform = ""), 100);
     return;
   }
-  // تحديث فوري على الشاشة
   S.energy -= 1;
   S.coins += S.coins_per_tap;
   S.total_taps += 1;
@@ -221,27 +219,31 @@ els.coinBtn.addEventListener("click", () => {
   sendTimer = setTimeout(sendPendingTaps, 250);
 });
 
-// ===== الإعلان =====
+// ===== الإعلان الحقيقي (Monetag) =====
+const AD_SDK_FN = "show_11673059"; // اسم الدالة اللي جابها Monetag
+
 els.adBtn.addEventListener("click", () => {
   const now = Date.now();
   if (now - lastAdClientTime < 15000) return;
+  if (typeof window[AD_SDK_FN] !== "function") {
+    alert("الإعلانات لسه بتتحمّل، جرب تاني بعد شوية.");
+    return;
+  }
   lastAdClientTime = now;
 
-  els.adOverlay.classList.remove("hidden");
   els.adBtn.disabled = true;
-  let secondsLeft = 5;
-  els.adCountdown.textContent = secondsLeft;
-  els.adProgressFill.style.width = "0%";
+  els.adOverlay.classList.remove("hidden");
+  els.adProgressFill.style.width = "60%";
 
-  const interval = setInterval(() => {
-    secondsLeft -= 1;
-    els.adCountdown.textContent = secondsLeft > 0 ? secondsLeft : "تمام ✅";
-    els.adProgressFill.style.width = `${((5 - secondsLeft) / 5) * 100}%`;
-    if (secondsLeft <= 0) {
-      clearInterval(interval);
-      setTimeout(finishAdWatch, 400);
-    }
-  }, 1000);
+  window[AD_SDK_FN]()
+    .then(() => {
+      finishAdWatch();
+    })
+    .catch(() => {
+      els.adOverlay.classList.add("hidden");
+      els.adBtn.disabled = false;
+      lastAdClientTime = 0;
+    });
 });
 
 async function finishAdWatch() {
@@ -346,4 +348,4 @@ setInterval(() => {
 
 renderProfile();
 fetchState();
-setInterval(fetchState, 10000); // مزامنة كاملة كل 10 ثواني احتياطي
+setInterval(fetchState, 10000);
