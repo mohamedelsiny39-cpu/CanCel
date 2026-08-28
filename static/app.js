@@ -10,7 +10,7 @@ function computeLevel(coins) {
   }
   return level;
 }
-function coinsPerTap(level) { return level; }
+function coinsPerTap(level) { return Math.floor(level / 10) + 1; }
 function levelProgress(coins, level) {
   if (level >= MAX_LEVEL) return { progress: 1, nextTh: null };
   const prev = levelThreshold(level);
