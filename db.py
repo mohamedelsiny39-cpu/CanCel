@@ -7,8 +7,11 @@ _lock = threading.Lock()
 
 MAX_ENERGY = 100
 FULL_REFILL_SECONDS = 3600  # الطاقة بترجع كاملة كل ساعة
-AD_REWARD = 10
-AD_COOLDOWN_SECONDS = 15
+AD_REWARDS = {
+    "interstitial": 15,  # فيديو كامل الشاشة (أعلى قيمة)
+    "popup": 10,          # عرض خارجي (أسرع، قيمة أقل)
+}
+AD_COOLDOWN_SECONDS = 10
 MAX_LEVEL = 100
 REFERRAL_REWARD = 500          # بيدّيها اللي بيدعي، لكل صديق جديد
 REFERRAL_SIGNUP_BONUS = 100    # هدية ترحيب لللي جه عن طريق دعوة
@@ -252,7 +255,11 @@ def tap_batch(user_id: int, count: int):
         }
 
 
-def watch_ad(user_id: int):
+def watch_ad(user_id: int, ad_type: str = "interstitial"):
+    reward = AD_REWARDS.get(ad_type)
+    if reward is None:
+        return {"error": "invalid_ad_type"}
+
     with _lock, _get_conn() as conn:
         row = conn.execute("SELECT * FROM users WHERE user_id=?", (user_id,)).fetchone()
         if row is None:
@@ -262,7 +269,7 @@ def watch_ad(user_id: int):
         if remaining > 0:
             return {"error": "cooldown", "seconds_left": int(remaining) + 1}
 
-        coins = row["coins"] + AD_REWARD
+        coins = row["coins"] + reward
         ads_watched = row["ads_watched"] + 1
         conn.execute(
             "UPDATE users SET coins=?, ads_watched=?, last_ad_time=?, last_active=? "
@@ -270,7 +277,8 @@ def watch_ad(user_id: int):
             (coins, ads_watched, now, now, user_id),
         )
         conn.commit()
-        return {"reward": AD_REWARD}
+        return {"reward": reward, "ad_type": ad_type}
+
 
 
 def get_tasks_status(user_id: int):
