@@ -235,6 +235,43 @@ html, body {
 .ad-btn:disabled { opacity: 0.5; }
 .ad-icon { font-size: 17px; }
 
+/* ===== زرارين الإعلان المميزين ===== */
+.ad-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.ad-mini-btn {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(180deg, rgba(139,92,246,0.18), rgba(52,217,196,0.08));
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  color: var(--text);
+  padding: 12px 6px 10px;
+  border-radius: 14px;
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+.ad-mini-btn:active { transform: scale(0.96); }
+.ad-mini-btn:disabled { opacity: 0.55; }
+.ad-mini-icon { font-size: 19px; }
+.ad-mini-label { font-size: 11px; font-weight: 700; }
+.ad-mini-reward { font-family: var(--font-mono); font-size: 11px; color: var(--gold); font-weight: 700; }
+.ad-mini-badge {
+  position: absolute;
+  top: -7px;
+  left: 8px;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+}
+.ad-badge-video { background: var(--purple); color: #fff; }
+.ad-badge-external { background: var(--teal); color: #06342e; }
+.ad-mini-cooldown { color: var(--text-muted); }
+
+
 .energy-wrap { margin-top: 0; }
 .energy-row {
   display: flex;
