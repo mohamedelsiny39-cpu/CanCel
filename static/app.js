@@ -64,7 +64,8 @@ const els = {
   levelBarNum: document.getElementById("levelBarNum"),
   levelBarNext: document.getElementById("levelBarNext"),
   levelBarFill: document.getElementById("levelBarFill"),
-  adBtn: document.getElementById("adBtn"),
+  adBtnVideo: document.getElementById("adBtnVideo"),
+  adBtnExternal: document.getElementById("adBtnExternal"),
   adOverlay: document.getElementById("adOverlay"),
   adProgressFill: document.getElementById("adProgressFill"),
   tasksList: document.getElementById("tasksList"),
@@ -227,43 +228,92 @@ els.coinBtn.addEventListener("click", () => {
   sendTimer = setTimeout(sendPendingTaps, 250);
 });
 
-// ===== الإعلان الحقيقي (Monetag) =====
-const AD_SDK_FN = "show_11673059"; // اسم الدالة اللي جابها Monetag
+// ===== الإعلانات الحقيقية (Monetag) =====
+const AD_ZONE_FN = "show_11673059"; // نفس الدالة لكل الفورمات، بنفرّق بينها بالباراميتر
+const AD_COOLDOWN_MS = 10000; // نفس قيمة AD_COOLDOWN_SECONDS في db.py - خليهم متطابقين دايماً
 
-els.adBtn.addEventListener("click", () => {
-  const now = Date.now();
-  if (now - lastAdClientTime < 15000) return;
-  if (typeof window[AD_SDK_FN] !== "function") {
-    alert("الإعلانات لسه بتتحمّل، جرب تاني بعد شوية.");
-    return;
-  }
-  lastAdClientTime = now;
+function waitForAdSdk(timeoutMs = 4000, intervalMs = 200) {
+  return new Promise((resolve) => {
+    if (typeof window[AD_ZONE_FN] === "function") {
+      resolve(true);
+      return;
+    }
+    const start = Date.now();
+    const check = setInterval(() => {
+      if (typeof window[AD_ZONE_FN] === "function") {
+        clearInterval(check);
+        resolve(true);
+      } else if (Date.now() - start > timeoutMs) {
+        clearInterval(check);
+        resolve(false);
+      }
+    }, intervalMs);
+  });
+}
 
-  els.adBtn.disabled = true;
-  els.adOverlay.classList.remove("hidden");
-  els.adProgressFill.style.width = "60%"; // مؤشر تحميل بسيط لحد ما الإعلان الحقيقي يظهر فوقه
+// بيبدأ عدّاد تنازلي على الزرار بعد المشاهدة، لحد ما يشتغل تاني
+function startCooldownDisplay(btnEl, labelEl, originalLabel) {
+  let secondsLeft = Math.ceil(AD_COOLDOWN_MS / 1000);
+  btnEl.disabled = true;
+  labelEl.textContent = `استنى ${secondsLeft}ث`;
+  const interval = setInterval(() => {
+    secondsLeft -= 1;
+    if (secondsLeft <= 0) {
+      clearInterval(interval);
+      labelEl.textContent = originalLabel;
+      btnEl.disabled = false;
+    } else {
+      labelEl.textContent = `استنى ${secondsLeft}ث`;
+    }
+  }, 1000);
+}
 
-  window[AD_SDK_FN]()
-    .then(() => {
-      // المستخدم شاف الإعلان كامل -> استحق المكافأة
-      finishAdWatch();
-    })
-    .catch(() => {
-      // مفيش إعلان متاح دلوقتي أو المستخدم قفله بدري
+function setupAdButton(btnEl, adType, sdkArg) {
+  const labelEl = btnEl.querySelector(".ad-mini-label");
+  const originalLabel = labelEl.textContent;
+
+  btnEl.addEventListener("click", async () => {
+    const now = Date.now();
+    if (now - lastAdClientTime < AD_COOLDOWN_MS) return;
+
+    btnEl.disabled = true;
+    els.adOverlay.classList.remove("hidden");
+    els.adProgressFill.style.width = "30%";
+
+    const ready = await waitForAdSdk();
+    if (!ready) {
       els.adOverlay.classList.add("hidden");
-      els.adBtn.disabled = false;
-      lastAdClientTime = 0; // اسمحله يجرب تاني على طول
-    });
-});
+      btnEl.disabled = false;
+      alert("مفيش إعلانات متاحة دلوقتي، جرب تاني بعد شوية 🙏");
+      return;
+    }
 
-async function finishAdWatch() {
+    lastAdClientTime = now;
+    els.adProgressFill.style.width = "70%";
+
+    const call = sdkArg === undefined
+      ? window[AD_ZONE_FN]()
+      : window[AD_ZONE_FN](sdkArg);
+
+    call
+      .then(() => finishAdWatch(adType, btnEl, labelEl, originalLabel))
+      .catch(() => {
+        els.adOverlay.classList.add("hidden");
+        btnEl.disabled = false;
+        lastAdClientTime = 0; // اسمحله يجرب تاني على طول لو فشل
+      });
+  });
+}
+
+async function finishAdWatch(adType, btnEl, labelEl, originalLabel) {
   els.adOverlay.classList.add("hidden");
-  els.adBtn.disabled = false;
   try {
     const res = await fetch("/api/watch_ad", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: user.id, first_name: user.first_name, photo_url: user.photo_url }),
+      body: JSON.stringify({
+        user_id: user.id, first_name: user.first_name, photo_url: user.photo_url, ad_type: adType,
+      }),
     });
     const state = await res.json();
     if (res.ok) {
@@ -271,7 +321,29 @@ async function finishAdWatch() {
       if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
     }
   } catch (e) { /* تجاهل */ }
+  startCooldownDisplay(btnEl, labelEl, originalLabel);
 }
+
+setupAdButton(els.adBtnVideo, "interstitial", undefined); // show_11673059()
+setupAdButton(els.adBtnExternal, "popup", "pop");          // show_11673059('pop')
+
+// ===== In-App Interstitial: فورمات تلقائي في الخلفية، من غير زرار ومن غير مكافأة =====
+function initInAppAds() {
+  waitForAdSdk().then((ready) => {
+    if (!ready || typeof window[AD_ZONE_FN] !== "function") return;
+    window[AD_ZONE_FN]({
+      type: "inApp",
+      inAppSettings: {
+        frequency: 2,
+        capping: 0.1,
+        interval: 30,
+        timeout: 5,
+        everyPage: false,
+      },
+    });
+  });
+}
+initInAppAds();
 
 // ===== المهام =====
 async function loadTasks() {
@@ -351,7 +423,6 @@ els.refCopyBtn.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(referralLink);
   } catch (e) {
-    // fallback لو الكليبورد مش متاح
     const ta = document.createElement("textarea");
     ta.value = referralLink;
     document.body.appendChild(ta);
