@@ -85,20 +85,23 @@ def api_tap_batch():
 def api_watch_ad():
     data = request.get_json(silent=True) or {}
     user_id = data.get("user_id")
+    ad_type = data.get("ad_type", "interstitial")
     if not user_id:
         return jsonify({"error": "user_id required"}), 400
 
     db.get_or_create_user(user_id, data.get("first_name", ""), data.get("photo_url", ""))
-    result = db.watch_ad(user_id)
+    result = db.watch_ad(user_id, ad_type)
     if result is None:
         return jsonify({"error": "user not found"}), 404
     if "error" in result:
-        return jsonify(result), 429
+        status = 429 if result["error"] == "cooldown" else 400
+        return jsonify(result), status
 
     row = db.get_or_create_user(user_id)
     state = build_state(row)
     state["ad_reward"] = result["reward"]
     return jsonify(state)
+
 
 
 @app.route("/api/tasks")
